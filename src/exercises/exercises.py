@@ -22,12 +22,21 @@ def create_student(name: str, email: str) -> Student:
       - rollback
       - raise ValueError("duplicate email")
     """
-    raise NotImplementedError
+    double = db.session.query(Student).filter_by(email=email).first()
+    if double:
+        db.session.rollback()
+        raise ValueError("duplicate email")
+
+    student = Student(name=name, email=email)
+    db.session.add(student)
+    db.session.commit()
+    return student
 
 
 def find_student_by_email(email: str) -> Optional[Student]:
     """TODO: Return Student by email or None."""
-    raise NotImplementedError
+    student = db.session.query(Student).filter_by(email=email).first()
+    return student
 
 
 def add_grade(student_id: int, assignment_id: int, score: int) -> Grade:
@@ -37,7 +46,14 @@ def add_grade(student_id: int, assignment_id: int, score: int) -> Grade:
     If assignment doesn't exist: raise LookupError
     If duplicate grade: raise ValueError("duplicate grade")
     """
-    raise NotImplementedError
+    student = db.session.get(Student, student_id)
+    if not student:
+        raise LookupError("student not found")
+    assignment = db.session.get(Assignment, assignment_id)
+    if not assignment:
+        raise LookupError("assignment not found")
+    if db.session.query(Grade).filter_by(student_id=student_id, assignment_id=assignment_id).first():
+        raise ValueError("duplicate grade")
 
 
 def average_percent(student_id: int) -> float:
@@ -48,19 +64,28 @@ def average_percent(student_id: int) -> float:
     If student doesn't exist: raise LookupError
     If student has no grades: return 0.0
     """
-    raise NotImplementedError
+    student = db.session.get(Student, student_id)
+    if not student:
+        raise LookupError("student not found")
+    if not student.grades:
+        return 0.0
+
+    score = db.session.query(func.sum(Grade.score)).filter_by(student_id=student_id).scalar()
+    max_points = db.session.query(func.sum(Assignment.max_points)).scalar()
+
+    return (score / max_points) * 100
 
 
 # ===== QUERYING & FILTERING =====
 
 def get_all_students() -> list[Student]:
     """TODO: Return all students in database, ordered by name."""
-    raise NotImplementedError
+    return db.session.query(Student).order_by(Student.name).all()
 
 
 def get_assignment_by_title(title: str) -> Optional[Assignment]:
     """TODO: Return assignment by title or None."""
-    raise NotImplementedError
+    return db.session.query(Assignment).filter_by(title=title).first()
 
 
 def get_student_grades(student_id: int) -> list[Grade]:
@@ -68,7 +93,10 @@ def get_student_grades(student_id: int) -> list[Grade]:
 
     If student doesn't exist: raise LookupError
     """
-    raise NotImplementedError
+    student = db.session.get(Student, student_id)
+    if not student:
+        raise LookupError("student not found")
+    return db.session.query(Grade).order_by(Assignment.title).all()
 
 
 def get_grades_for_assignment(assignment_id: int) -> list[Grade]:
@@ -76,7 +104,10 @@ def get_grades_for_assignment(assignment_id: int) -> list[Grade]:
 
     If assignment doesn't exist: raise LookupError
     """
-    raise NotImplementedError
+    assignment = db.session.get(Assignment, assignment_id)
+    if not assignment:
+        raise LookupError("assignment not found")
+    return db.session.query(Grade).order_by(Student.name).all()
 
 
 # ===== AGGREGATION =====
